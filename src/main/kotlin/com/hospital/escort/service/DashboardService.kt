@@ -4,12 +4,15 @@ import com.hospital.escort.api.ViolationDto
 import com.hospital.escort.api.WardDashboardDto
 import com.hospital.escort.common.ApiException
 import com.hospital.escort.domain.ApplicationStatus
+import com.hospital.escort.domain.CareReminderRepository
+import com.hospital.escort.domain.CareStatus
 import com.hospital.escort.domain.CaseStatus
 import com.hospital.escort.domain.EscortApplicationRepository
 import com.hospital.escort.domain.EscortCaseRepository
 import com.hospital.escort.domain.EscortPermitRepository
 import com.hospital.escort.domain.PermitStatus
 import com.hospital.escort.domain.PermitSyncRepository
+import com.hospital.escort.domain.ReminderStatus
 import com.hospital.escort.domain.ScanDirection
 import com.hospital.escort.domain.ScanRecordRepository
 import com.hospital.escort.domain.ViolationRecordRepository
@@ -37,6 +40,7 @@ class DashboardService(
     private val violationRepository: ViolationRecordRepository,
     private val applicationRepository: EscortApplicationRepository,
     @Suppress("unused") private val syncRepository: PermitSyncRepository,
+    private val reminderRepository: CareReminderRepository,
     @Value("\${escort.zone-id}") zoneIdValue: String
 ) {
     private val zoneId: ZoneId = ZoneId.of(zoneIdValue)
@@ -50,7 +54,11 @@ class DashboardService(
         val todayStart = LocalDate.now(zoneId).atStartOfDay(zoneId).toInstant()
 
         val activePermits = permitRepository.findByWardCodeAndStatus(wardCode, PermitStatus.ACTIVE)
-        val activePatients = caseRepository.findByWardCodeAndStatus(wardCode, CaseStatus.ACTIVE).size.toLong()
+        val activeCases = caseRepository.findByWardCodeAndStatus(wardCode, CaseStatus.ACTIVE)
+        val activePatients = activeCases.size.toLong()
+        val unattendedPatients = activeCases.count { it.careStatus == CareStatus.UNATTENDED }.toLong()
+        val pendingReminders = reminderRepository
+            .findByWardCodeAndStatusOrderByDueAtAsc(wardCode, ReminderStatus.NURSE_PENDING).size.toLong()
 
         // 当前在病区内的陪护人数: 每张有效证最后一次扫码方向为 IN(无记录视为在病区)
         var insideCount = 0L
@@ -92,6 +100,7 @@ class DashboardService(
         return WardDashboardDto(
             wardCode = wardCode, lockdown = policy.lockdown,
             activeEscortCount = insideCount, activePatientCount = activePatients,
+            unattendedPatientCount = unattendedPatients, pendingReminderCount = pendingReminders,
             todayEntryCount = todayIn, todayExitCount = todayOut,
             nightAbnormalCount = nightAbnormal, outOfHoursCount = outOfHoursToday,
             violationCount = violations.size.toLong(), violationsByType = byType,

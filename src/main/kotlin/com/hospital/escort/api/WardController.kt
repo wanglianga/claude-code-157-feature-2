@@ -1,6 +1,8 @@
 package com.hospital.escort.api
 
+import com.hospital.escort.domain.ReminderStatus
 import com.hospital.escort.service.ArchiveQueryService
+import com.hospital.escort.service.CareReminderService
 import com.hospital.escort.service.DashboardService
 import com.hospital.escort.service.WardAdminService
 import jakarta.validation.Valid
@@ -18,7 +20,8 @@ import org.springframework.web.bind.annotation.RestController
 class WardController(
     private val wardAdminService: WardAdminService,
     private val archiveQueryService: ArchiveQueryService,
-    private val dashboardService: DashboardService
+    private val dashboardService: DashboardService,
+    private val careReminderService: CareReminderService
 ) {
 
     @GetMapping
@@ -56,6 +59,18 @@ class WardController(
     @GetMapping("/{wardCode}/notices")
     fun notices(@PathVariable wardCode: String, @RequestParam(defaultValue = "false") unreadOnly: Boolean): List<WardNoticeDto> =
         archiveQueryService.listWardNotices(wardCode, unreadOnly)
+
+    /** 护士站巡查: 该病区当前"短时无人陪护"(临时替换间隙)的患者, 用于安排巡查 */
+    @GetMapping("/{wardCode}/unattended-patients")
+    fun unattendedPatients(@PathVariable wardCode: String): List<UnattendedPatientDto> =
+        careReminderService.listUnattendedPatients(wardCode)
+
+    /** 病区看护提醒(临时替换期间的进食/翻身/夜间观察, 可按状态过滤) */
+    @GetMapping("/{wardCode}/care-reminders")
+    fun careReminders(
+        @PathVariable wardCode: String,
+        @RequestParam(required = false) status: ReminderStatus?
+    ): List<CareReminderDto> = careReminderService.listWardReminders(wardCode, status)
 
     /** 管理者看板 */
     @GetMapping("/{wardCode}/dashboard")

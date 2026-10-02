@@ -2,6 +2,9 @@ package com.hospital.escort.domain
 
 enum class CaseStatus { ACTIVE, CLOSED }
 
+/** 患者当前陪护状态: WITH_ESCORT=有陪护人在岗, UNATTENDED=临时替换间隙短时无人陪护 */
+enum class CareStatus { WITH_ESCORT, UNATTENDED }
+
 enum class ApplicationType { INITIAL, REPLACEMENT }
 
 enum class ApplicationStatus { PENDING, APPROVED, REJECTED, WITHDRAWN }
@@ -20,7 +23,13 @@ enum class SyncStatus { PENDING, SYNCED, FAILED }
 /** 替换原因: ESCORT_SICK=陪护人临时生病, FAMILY_DISPUTE=亲属争抢陪护资格, SCHEDULE=排班调整, OTHER=其他 */
 enum class ReplacementReason { ESCORT_SICK, FAMILY_DISPUTE, SCHEDULE, OTHER }
 
-enum class ReplacementStatus { PENDING, APPROVED, REJECTED }
+enum class ReplacementStatus { PENDING, APPROVED, REJECTED, CANCELED }
+
+/** 临时看护提醒类型: FEEDING=进食, TURNING=翻身, NIGHT_WATCH=夜间观察/巡查 */
+enum class ReminderType { FEEDING, TURNING, NIGHT_WATCH }
+
+/** NURSE_PENDING=待护士巡查执行, NURSE_DONE=护士已执行, FAMILY_TAKEN_OVER=新陪护到位后家属接手 */
+enum class ReminderStatus { NURSE_PENDING, NURSE_DONE, FAMILY_TAKEN_OVER }
 
 enum class ScanDirection { IN, OUT }
 
@@ -64,5 +73,12 @@ enum class CaseEventType {
     DEPOSIT_DISPUTE_RAISED,
     DEPOSIT_DISPUTE_RESOLVED,
     CAREGIVER_CHANGED,
+    TEMP_REPLACEMENT_OLD_LEFT,
+    TEMP_REPLACEMENT_VERIFIED,
+    TEMP_REPLACEMENT_ARRIVED,
+    TEMP_REPLACEMENT_CANCELED,
+    CARE_REMINDER_CREATED,
+    CARE_REMINDER_NURSE_DONE,
+    CARE_REMINDER_TAKEN_OVER,
     CASE_CLOSED
 }

@@ -202,6 +202,90 @@ data class ReplacementDecisionRequest(
     val note: String? = null
 )
 
+// ---------- 陪护人临时替换(夜间发烧等紧急接替) ----------
+
+/**
+ * 临时替换申请: 原陪护突发疾病, 家属申请另一位亲属接替。
+ * 旧陪护已离院(旧证即时停用、患者进入短时无人陪护), 新陪护到院后再核验发证。
+ */
+data class TemporaryReplacementRequest(
+    @field:NotBlank(message = "原陪护证编号不能为空")
+    val oldPermitNo: String = "",
+    val reason: com.hospital.escort.domain.ReplacementReason = com.hospital.escort.domain.ReplacementReason.ESCORT_SICK,
+    val detail: String? = null,
+    /** 旧陪护实际离院时间, 缺省为当前时间 */
+    val oldLeftAt: java.time.Instant? = null,
+    // 新陪护人身份信息(家属申报)
+    @field:NotBlank(message = "新陪护人姓名不能为空")
+    val escortName: String = "",
+    @field:NotBlank(message = "新陪护人身份证号不能为空")
+    @field:Pattern(regexp = "^[0-9A-Za-z]{6,24}$", message = "身份证号格式不正确")
+    val escortIdNo: String = "",
+    @field:NotBlank(message = "新陪护人联系方式不能为空")
+    @field:Pattern(regexp = "^[0-9+\\-]{7,20}$", message = "联系方式格式不正确")
+    val escortPhone: String = "",
+    @field:NotBlank(message = "新陪护人与患者关系不能为空(需亲属关系核验)")
+    val relationToPatient: String = "",
+    /** 家属/新陪护人的健康承诺(无发热/传染病症状), 必须确认 */
+    @field:NotNull(message = "新陪护人必须确认健康承诺")
+    val healthCommitment: Boolean? = null,
+    val screeningType: ScreeningType = ScreeningType.NONE,
+    val screeningValidUntil: java.time.Instant? = null,
+    val periodStart: java.time.Instant? = null,
+    val periodEnd: java.time.Instant? = null,
+    val needNightCare: Boolean = false,
+    /** 若新陪护已提前到护士站, 可随申请一并核验身份/关系, 到位时直接交接 */
+    val identityVerified: Boolean = false,
+    val relationVerified: Boolean = false,
+    val verifiedBy: String? = null
+)
+
+/**
+ * 新陪护到位交接: 护士站当面核验身份、健康承诺与亲属关系,
+ * 三项核验通过后审批新申请、签发新证、结束无人陪护间隙并回填交接时间。
+ */
+data class ReplacementArrivalRequest(
+    @field:NotBlank(message = "交接护士工号不能为空")
+    val operator: String = "",
+    /** 实际到位时间, 缺省为当前时间 */
+    val arrivedAt: java.time.Instant? = null,
+    /** 当面核验证件与本人一致(申请时已核验可不传) */
+    val identityVerified: Boolean? = null,
+    /** 当面再次确认健康承诺 */
+    val healthCommitmentAccepted: Boolean? = null,
+    /** 核验与患者亲属关系属实 */
+    val relationVerified: Boolean? = null,
+    val note: String? = null
+)
+
+data class ReplacementCancelRequest(
+    @field:NotBlank(message = "操作人不能为空")
+    val operator: String = "",
+    val reason: String? = null
+)
+
+// ---------- 临时看护提醒(进食/翻身/夜间观察) ----------
+
+data class CareReminderRequest(
+    /** 患者陪护记录号(无人陪护间隙中的患者) */
+    @field:NotBlank(message = "陪护记录号不能为空")
+    val caseNo: String = "",
+    @field:NotNull(message = "提醒类型不能为空(FEEDING/TURNING/NIGHT_WATCH)")
+    val type: com.hospital.escort.domain.ReminderType? = null,
+    val note: String? = null,
+    /** 计划提醒/巡查时间, 缺省为当前时间 */
+    val dueAt: java.time.Instant? = null,
+    @field:NotBlank(message = "创建护士工号不能为空")
+    val createdBy: String = ""
+)
+
+data class CareReminderActionRequest(
+    @field:NotBlank(message = "操作护士工号不能为空")
+    val operator: String = "",
+    val note: String? = null,
+    val actedAt: java.time.Instant? = null
+)
+
 data class CloseCaseRequest(
     @field:NotBlank(message = "操作人不能为空")
     val operator: String = "",
@@ -258,6 +342,8 @@ data class CaseArchiveDto(
     val patientInpatientNo: String,
     val wardCode: String,
     val status: String,
+    val careStatus: String,
+    val unattendedSince: java.time.Instant?,
     val currentEscortName: String?,
     val currentEscortPhone: String?,
     val applications: List<ApplicationDto>,
@@ -265,6 +351,7 @@ data class CaseArchiveDto(
     val scans: List<ScanRecordDto>,
     val replacements: List<ReplacementDto>,
     val violations: List<ViolationDto>,
+    val reminders: List<CareReminderDto>,
     val events: List<EventDto>,
     val createdAt: Instant,
     val closedAt: Instant?
@@ -290,11 +377,54 @@ data class ReplacementDto(
     val reason: String,
     val detail: String?,
     val status: String,
+    val temporary: Boolean,
     val oldPermitNo: String?,
     val newPermitNo: String?,
+    val newEscortName: String?,
+    val relationToPatient: String?,
+    val identityVerified: Boolean,
+    val healthPromiseAccepted: Boolean,
+    val relationVerified: Boolean,
+    val oldLeftAt: java.time.Instant?,
+    val newArrivedAt: java.time.Instant?,
+    val gapMinutes: Int?,
     val requestedAt: Instant,
     val decidedAt: Instant?,
     val decidedBy: String?
+)
+
+data class CareReminderDto(
+    val id: Long,
+    val caseNo: String,
+    val wardCode: String,
+    val replacementId: Long?,
+    val type: String,
+    val note: String?,
+    val dueAt: java.time.Instant,
+    val status: String,
+    val createdBy: String,
+    val createdAt: java.time.Instant,
+    val nurseDoneAt: java.time.Instant?,
+    val nurseDoneBy: String?,
+    val takenOverAt: java.time.Instant?,
+    val takenOverBy: String?
+)
+
+/** 护士站"短时无人陪护"巡查视图 */
+data class UnattendedPatientDto(
+    val caseNo: String,
+    val patientInpatientNo: String,
+    val wardCode: String,
+    val bedNo: String?,
+    val previousEscortName: String?,
+    val previousEscortPhone: String?,
+    val replacementId: Long?,
+    val newEscortName: String?,
+    val newEscortPhone: String?,
+    val relationToPatient: String?,
+    val unattendedSince: java.time.Instant,
+    val unattendedMinutes: Long,
+    val pendingReminderCount: Long
 )
 
 data class ViolationDto(
@@ -333,6 +463,8 @@ data class WardDashboardDto(
     val lockdown: Boolean,
     val activeEscortCount: Long,
     val activePatientCount: Long,
+    val unattendedPatientCount: Long,
+    val pendingReminderCount: Long,
     val todayEntryCount: Long,
     val todayExitCount: Long,
     val nightAbnormalCount: Long,

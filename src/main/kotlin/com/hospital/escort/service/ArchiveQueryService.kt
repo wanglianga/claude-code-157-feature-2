@@ -1,6 +1,7 @@
 package com.hospital.escort.service
 
 import com.hospital.escort.api.ApplicationDto
+import com.hospital.escort.api.CareReminderDto
 import com.hospital.escort.api.CaseArchiveDto
 import com.hospital.escort.api.EventDto
 import com.hospital.escort.api.PermitDto
@@ -10,6 +11,7 @@ import com.hospital.escort.api.ViolationDto
 import com.hospital.escort.api.WardNoticeDto
 import com.hospital.escort.common.notFound
 import com.hospital.escort.domain.ApplicationStatus
+import com.hospital.escort.domain.CareReminderRepository
 import com.hospital.escort.domain.CaseEventRepository
 import com.hospital.escort.domain.EscortApplicationRepository
 import com.hospital.escort.domain.EscortCaseRepository
@@ -37,7 +39,8 @@ class ArchiveQueryService(
     private val violationRepository: ViolationRecordRepository,
     private val eventRepository: CaseEventRepository,
     private val syncRepository: PermitSyncRepository,
-    private val noticeRepository: WardNoticeRepository
+    private val noticeRepository: WardNoticeRepository,
+    private val reminderRepository: CareReminderRepository
 ) {
 
     @Transactional(readOnly = true)
@@ -54,6 +57,8 @@ class ArchiveQueryService(
             patientInpatientNo = escortCase.patientInpatientNo,
             wardCode = escortCase.wardCode,
             status = escortCase.status.name,
+            careStatus = escortCase.careStatus.name,
+            unattendedSince = escortCase.unattendedSince,
             currentEscortName = escortCase.currentEscortName,
             currentEscortPhone = escortCase.currentEscortPhone,
             applications = applications.map { it.toDto(escortCase.caseNo) },
@@ -65,14 +70,24 @@ class ArchiveQueryService(
             },
             scans = scanRepository.findByCaseIdOrderByScannedAtAsc(caseId).map { it.toDto() },
             replacements = replacementRepository.findByCaseIdOrderByRequestedAtAsc(caseId).map { r ->
+                val newApp = applications.firstOrNull { it.id == r.newApplicationId }
                 ReplacementDto(
                     id = r.id!!, reason = r.reason.name, detail = r.detail, status = r.status.name,
+                    temporary = r.temporary,
                     oldPermitNo = r.oldPermitId?.let { permitNoById[it] },
                     newPermitNo = r.newPermitId?.let { permitNoById[it] },
+                    newEscortName = newApp?.escortName,
+                    relationToPatient = newApp?.relationToPatient,
+                    identityVerified = r.identityVerified,
+                    healthPromiseAccepted = r.healthPromiseAccepted,
+                    relationVerified = r.relationVerified,
+                    oldLeftAt = r.oldLeftAt, newArrivedAt = r.newArrivedAt, gapMinutes = r.gapMinutes,
                     requestedAt = r.requestedAt, decidedAt = r.decidedAt, decidedBy = r.decidedBy
                 )
             },
             violations = violationRepository.findByCaseIdOrderByCreatedAtAsc(caseId).map { it.toDto() },
+            reminders = reminderRepository.findByCaseIdOrderByCreatedAtAsc(caseId)
+                .map { it.toDto(escortCase.caseNo) },
             events = eventRepository.findByCaseIdOrderByCreatedAtAsc(caseId).map {
                 EventDto(it.eventType.name, it.actor, it.summary, it.detail, it.refType, it.refId, it.createdAt)
             },
@@ -128,4 +143,12 @@ fun com.hospital.escort.domain.ScanRecord.toDto() = ScanRecordDto(
 fun com.hospital.escort.domain.ViolationRecord.toDto() = ViolationDto(
     id = id!!, type = type.name, detail = detail, reportedBy = reportedBy, status = status.name,
     createdAt = createdAt, resolvedAt = resolvedAt, resolutionNote = resolutionNote
+)
+
+fun com.hospital.escort.domain.CareReminder.toDto(caseNo: String) = CareReminderDto(
+    id = id!!, caseNo = caseNo, wardCode = wardCode, replacementId = replacementId,
+    type = type.name, note = note, dueAt = dueAt, status = status.name,
+    createdBy = createdBy, createdAt = createdAt,
+    nurseDoneAt = nurseDoneAt, nurseDoneBy = nurseDoneBy,
+    takenOverAt = takenOverAt, takenOverBy = takenOverBy
 )

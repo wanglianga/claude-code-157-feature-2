@@ -1,5 +1,7 @@
-# 可选的容器化依赖(本机已有 PostgreSQL 时用 scripts/local-db.sh 即可, 无需启动)
-# 用法: docker compose up -d
+# 一键启动: docker compose up --build
+#  - postgres: 持久化数据库(端口 55432)
+#  - app:      陪护证服务(端口 8080, 自动等待数据库就绪并由 Flyway 建表/迁移)
+#  - kafka:    可选(默认 ESCORT_KAFKA_ENABLED=false, 门禁同步走本地模拟; 置 true 时启用)
 services:
   postgres:
     image: postgres:15-alpine
@@ -11,9 +13,31 @@ services:
       - "55432:5432"
     volumes:
       - escort-pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U escort -d escort"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/escort
+      DB_USER: escort
+      DB_PASSWORD: escort
+      ESCORT_KAFKA_ENABLED: "false"
+      SERVER_PORT: "8080"
+    ports:
+      - "8080:8080"
 
   kafka:
     image: bitnami/kafka:3.7
+    profiles: ["kafka"]
     environment:
       KAFKA_CFG_NODE_ID: "0"
       KAFKA_CFG_PROCESS_ROLES: "broker,controller"

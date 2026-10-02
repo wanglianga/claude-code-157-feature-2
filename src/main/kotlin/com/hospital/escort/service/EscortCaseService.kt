@@ -1,6 +1,7 @@
 package com.hospital.escort.service
 
 import com.hospital.escort.common.notFound
+import com.hospital.escort.domain.CareStatus
 import com.hospital.escort.domain.CaseEvent
 import com.hospital.escort.domain.CaseEventRepository
 import com.hospital.escort.domain.CaseEventType
@@ -66,6 +67,9 @@ class EscortCaseService(
     fun getCaseNoById(caseId: Long): String = getById(caseId).caseNo
 
     @Transactional
+    fun saveCase(escortCase: EscortCase): EscortCase = caseRepository.save(escortCase)
+
+    @Transactional
     fun recordEvent(
         caseId: Long,
         type: CaseEventType,
@@ -129,5 +133,70 @@ class EscortCaseService(
         recordEvent(escortCase.id!!, CaseEventType.CASE_CLOSED, actor, "陪护记录关闭", reason)
         notifyWard(escortCase.wardCode, escortCase.id, null, "CASE_CLOSED",
             "患者[${escortCase.patientInpatientNo}]陪护记录已关闭: $reason")
+    }
+
+    /**
+     * 临时替换: 旧陪护离院、新陪护未到, 患者进入"短时无人陪护"状态。
+     * 清空当前照护人快照(护士站看板可见), 记录离院时间并通知病区安排巡查。
+     */
+    @Transactional
+    fun markUnattended(
+        escortCase: EscortCase,
+        replacementId: Long,
+        leftAt: Instant,
+        oldEscortName: String,
+        actor: String?,
+        reasonDetail: String?
+    ) {
+        escortCase.careStatus = CareStatus.UNATTENDED
+        escortCase.unattendedSince = leftAt
+        escortCase.pendingReplacementId = replacementId
+        escortCase.currentPermitId = null
+        escortCase.currentEscortName = null
+        escortCase.currentEscortIdNo = null
+        escortCase.currentEscortPhone = null
+        caseRepository.save(escortCase)
+        recordEvent(
+            escortCase.id!!, CaseEventType.TEMP_REPLACEMENT_OLD_LEFT, actor,
+            "原陪护 $oldEscortName 已离院, 患者进入短时无人陪护状态, 等待新陪护到院交接",
+            "旧陪护离院时间=$leftAt${reasonDetail?.let { "; $it" } ?: ""}",
+            "REPLACEMENT", replacementId
+        )
+        notifyWard(
+            escortCase.wardCode, escortCase.id, null, "TEMP_REPLACEMENT_UNATTENDED",
+            "患者[${escortCase.patientInpatientNo}]原陪护 $oldEscortName 已于 $leftAt 离院, 新陪护尚未到院, " +
+                    "当前短时无人陪护, 请护士站安排巡查(进食/翻身/夜间观察)"
+        )
+    }
+
+    /**
+     * 新陪护到位交接完成: 结束无人陪护间隙, 恢复"有陪护"状态。
+     * 当前照护人快照已由发证流程更新, 这里补充交接事件与病区通知(含交接时间与无人陪护时长)。
+     */
+    @Transactional
+    fun finishUnattendedGap(
+        escortCase: EscortCase,
+        replacementId: Long,
+        operator: String,
+        newEscortName: String,
+        arrivedAt: Instant,
+        gapMinutes: Int,
+        reminderTakenOver: Int
+    ) {
+        escortCase.careStatus = CareStatus.WITH_ESCORT
+        escortCase.unattendedSince = null
+        escortCase.pendingReplacementId = null
+        caseRepository.save(escortCase)
+        recordEvent(
+            escortCase.id!!, CaseEventType.TEMP_REPLACEMENT_ARRIVED, operator,
+            "新陪护 $newEscortName 已到院完成交接, 无人陪护间隙结束(共 $gapMinutes 分钟)",
+            "交接时间=$arrivedAt; 身份/健康承诺/亲属关系已核验; $reminderTakenOver 条看护提醒转为家属已接手",
+            "REPLACEMENT", replacementId
+        )
+        notifyWard(
+            escortCase.wardCode, escortCase.id, escortCase.currentPermitId, "TEMP_REPLACEMENT_ARRIVED",
+            "患者[${escortCase.patientInpatientNo}]新陪护 $newEscortName 已于 $arrivedAt 到位交接, " +
+                    "无人陪护 $gapMinutes 分钟, 现由 $newEscortName 照护; $reminderTakenOver 条看护提醒已转家属接手"
+        )
     }
 }

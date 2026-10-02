@@ -18,6 +18,9 @@ interface EscortCaseRepository : JpaRepository<EscortCase, Long> {
     ): EscortCase?
 
     fun findByWardCodeAndStatus(wardCode: String, status: CaseStatus): List<EscortCase>
+
+    /** 护士站查看某病区当前处于"短时无人陪护"的患者(临时替换间隙) */
+    fun findByWardCodeAndCareStatus(wardCode: String, careStatus: CareStatus): List<EscortCase>
 }
 
 interface EscortApplicationRepository : JpaRepository<EscortApplication, Long> {
@@ -55,6 +58,18 @@ interface PermitSyncRepository : JpaRepository<PermitSync, Long> {
 
 interface ReplacementRecordRepository : JpaRepository<ReplacementRecord, Long> {
     fun findByCaseIdOrderByRequestedAtAsc(caseId: Long): List<ReplacementRecord>
+}
+
+interface CareReminderRepository : JpaRepository<CareReminder, Long> {
+    fun findByCaseIdOrderByCreatedAtAsc(caseId: Long): List<CareReminder>
+    fun findByWardCodeAndStatusOrderByDueAtAsc(wardCode: String, status: ReminderStatus): List<CareReminder>
+    fun findByWardCodeOrderByCreatedAtDesc(wardCode: String): List<CareReminder>
+
+    /** 某条临时替换记录下尚未被家属接手的提醒(含护士已执行的), 新陪护到位时自动转接手 */
+    fun findByReplacementIdAndStatusNot(replacementId: Long, status: ReminderStatus): List<CareReminder>
+
+    /** 无人陪护期间、未挂接到具体替换记录的遗留提醒, 新陪护到位时一并转接手 */
+    fun findByCaseIdAndReplacementIdNullAndStatusNot(caseId: Long, status: ReminderStatus): List<CareReminder>
 }
 
 interface ScanRecordRepository : JpaRepository<ScanRecord, Long> {

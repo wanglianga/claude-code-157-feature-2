@@ -79,6 +79,19 @@ class EscortCase(
     @Column(name = "current_escort_phone")
     var currentEscortPhone: String? = null,
 
+    /** 当前陪护状态: 有陪护 / 临时替换间隙无人陪护 */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "care_status", nullable = false)
+    var careStatus: CareStatus = CareStatus.WITH_ESCORT,
+
+    /** 进入无人陪护状态的时间(旧陪护离院时间), 新陪护到位后清空 */
+    @Column(name = "unattended_since")
+    var unattendedSince: Instant? = null,
+
+    /** 无人陪护间隙进行中的临时替换记录 id */
+    @Column(name = "pending_replacement_id")
+    var pendingReplacementId: Long? = null,
+
     @Column(name = "created_at", nullable = false)
     var createdAt: Instant = Instant.now(),
 
@@ -308,7 +321,49 @@ class ReplacementRecord(
     var decidedAt: Instant? = null,
 
     @Column(name = "decided_by")
-    var decidedBy: String? = null
+    var decidedBy: String? = null,
+
+    /** 临时替换(原陪护突发疾病等紧急接替), 存在"旧已离院/新未到"的无人陪护间隙 */
+    @Column(name = "temporary", nullable = false)
+    var temporary: Boolean = false,
+
+    // ---- 护士站核验: 身份 / 健康承诺 / 与患者关系 ----
+    @Column(name = "identity_verified", nullable = false)
+    var identityVerified: Boolean = false,
+
+    @Column(name = "identity_verified_by")
+    var identityVerifiedBy: String? = null,
+
+    @Column(name = "identity_verified_at")
+    var identityVerifiedAt: Instant? = null,
+
+    @Column(name = "health_promise_accepted", nullable = false)
+    var healthPromiseAccepted: Boolean = false,
+
+    @Column(name = "relation_verified", nullable = false)
+    var relationVerified: Boolean = false,
+
+    // ---- 交接时间点 ----
+    /** 旧陪护离院时间(进入无人陪护间隙) */
+    @Column(name = "old_left_at")
+    var oldLeftAt: Instant? = null,
+
+    /** 新陪护到位交接时间(无人陪护间隙结束) */
+    @Column(name = "new_arrived_at")
+    var newArrivedAt: Instant? = null,
+
+    /** 无人陪护时长(分钟), 到位交接时回填 */
+    @Column(name = "gap_minutes")
+    var gapMinutes: Int? = null,
+
+    @Column(name = "canceled_at")
+    var canceledAt: Instant? = null,
+
+    @Column(name = "canceled_by")
+    var canceledBy: String? = null,
+
+    @Column(name = "cancel_reason")
+    var cancelReason: String? = null
 )
 
 @Entity
@@ -472,4 +527,58 @@ class WardNotice(
 
     @Column(name = "created_at", nullable = false)
     var createdAt: Instant = Instant.now()
+)
+
+/**
+ * 临时看护提醒: 临时替换(无人陪护)期间护士站为患者临时创建,
+ * 用于进食/翻身/夜间观察巡查; 新陪护到位后自动转为家属已接手并保留交接时间。
+ */
+@Entity
+@Table(name = "care_reminder")
+class CareReminder(
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    var id: Long? = null,
+
+    @Column(name = "case_id", nullable = false)
+    var caseId: Long = 0,
+
+    @Column(name = "ward_code", nullable = false)
+    var wardCode: String = "",
+
+    @Column(name = "replacement_id")
+    var replacementId: Long? = null,
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "type", nullable = false)
+    var type: ReminderType = ReminderType.FEEDING,
+
+    @Column(name = "note")
+    var note: String? = null,
+
+    @Column(name = "due_at", nullable = false)
+    var dueAt: Instant = Instant.now(),
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status", nullable = false)
+    var status: ReminderStatus = ReminderStatus.NURSE_PENDING,
+
+    @Column(name = "created_by", nullable = false)
+    var createdBy: String = "",
+
+    @Column(name = "created_at", nullable = false)
+    var createdAt: Instant = Instant.now(),
+
+    @Column(name = "nurse_done_at")
+    var nurseDoneAt: Instant? = null,
+
+    @Column(name = "nurse_done_by")
+    var nurseDoneBy: String? = null,
+
+    /** 家属接手时间(= 新陪护到位交接时间) */
+    @Column(name = "taken_over_at")
+    var takenOverAt: Instant? = null,
+
+    @Column(name = "taken_over_by")
+    var takenOverBy: String? = null
 )
