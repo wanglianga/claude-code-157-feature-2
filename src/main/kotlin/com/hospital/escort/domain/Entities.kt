@@ -301,6 +301,52 @@ class ReplacementRecord(
     @Column(name = "status", nullable = false)
     var status: ReplacementStatus = ReplacementStatus.PENDING,
 
+    /** REGULAR=常规替换; TEMPORARY=临时替换(夜间发烧等紧急场景, 允许空窗与两阶段交接) */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "mode", nullable = false)
+    var mode: ReplacementMode = ReplacementMode.REGULAR,
+
+    // ---- 临时替换交接时间轴与护士站核验 ----
+    /** 旧陪护离院时间: 空窗开始, 患者短时无人陪护 */
+    @Column(name = "old_escort_left_at")
+    var oldEscortLeftAt: Instant? = null,
+
+    /** 新陪护到院时间: 空窗结束 */
+    @Column(name = "new_escort_arrived_at")
+    var newEscortArrivedAt: Instant? = null,
+
+    /** 交接完成时间(新陪护身份复核通过、新证签发) */
+    @Column(name = "handover_completed_at")
+    var handoverCompletedAt: Instant? = null,
+
+    /** 新陪护与患者关系经护士站核验 */
+    @Column(name = "relation_verified", nullable = false)
+    var relationVerified: Boolean = false,
+
+    /** 新陪护身份经护士站现场核验(身份证与本人一致) */
+    @Column(name = "identity_verified", nullable = false)
+    var identityVerified: Boolean = false,
+
+    /** 健康承诺/筛查经护士站核验 */
+    @Column(name = "health_verified", nullable = false)
+    var healthVerified: Boolean = false,
+
+    /** 夜间陪护专项批准 */
+    @Column(name = "night_care_approved", nullable = false)
+    var nightCareApproved: Boolean = false,
+
+    @Column(name = "completed_by")
+    var completedBy: String? = null,
+
+    @Column(name = "cancelled_at")
+    var cancelledAt: Instant? = null,
+
+    @Column(name = "cancelled_by")
+    var cancelledBy: String? = null,
+
+    @Column(name = "cancel_reason")
+    var cancelReason: String? = null,
+
     @Column(name = "requested_at", nullable = false)
     var requestedAt: Instant = Instant.now(),
 
@@ -309,6 +355,117 @@ class ReplacementRecord(
 
     @Column(name = "decided_by")
     var decidedBy: String? = null
+)
+
+@Entity
+@Table(name = "patrol_record")
+class PatrolRecord(
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    var id: Long? = null,
+
+    @Column(name = "case_id", nullable = false)
+    var caseId: Long = 0,
+
+    @Column(name = "replacement_id", nullable = false)
+    var replacementId: Long = 0,
+
+    @Column(name = "ward_code", nullable = false)
+    var wardCode: String = "",
+
+    @Column(name = "bed_no")
+    var bedNo: String? = null,
+
+    @Column(name = "scheduled_at", nullable = false)
+    var scheduledAt: Instant = Instant.now(),
+
+    @Column(name = "scheduled_by", nullable = false)
+    var scheduledBy: String = "",
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status", nullable = false)
+    var status: PatrolStatus = PatrolStatus.SCHEDULED,
+
+    @Column(name = "result")
+    var result: String? = null,
+
+    @Column(name = "patrolled_at")
+    var patrolledAt: Instant? = null,
+
+    @Column(name = "patrolled_by")
+    var patrolledBy: String? = null,
+
+    @Column(name = "created_at", nullable = false)
+    var createdAt: Instant = Instant.now()
+)
+
+@Entity
+@Table(name = "care_reminder")
+class CareReminder(
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    var id: Long? = null,
+
+    @Column(name = "case_id", nullable = false)
+    var caseId: Long = 0,
+
+    /** 临时替换空窗期创建的提醒关联替换记录; 常规陪护期创建的为空 */
+    @Column(name = "replacement_id")
+    var replacementId: Long? = null,
+
+    /** 家属接手后关联其陪护证 */
+    @Column(name = "permit_id")
+    var permitId: Long? = null,
+
+    @Column(name = "ward_code", nullable = false)
+    var wardCode: String = "",
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "type", nullable = false)
+    var type: CareReminderType = CareReminderType.OTHER,
+
+    @Column(name = "content", nullable = false)
+    var content: String = "",
+
+    @Column(name = "remind_at", nullable = false)
+    var remindAt: Instant = Instant.now(),
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status", nullable = false)
+    var status: CareReminderStatus = CareReminderStatus.PENDING_NURSE,
+
+    @Column(name = "created_by", nullable = false)
+    var createdBy: String = "",
+
+    @Column(name = "created_at", nullable = false)
+    var createdAt: Instant = Instant.now(),
+
+    @Column(name = "taken_over_at")
+    var takenOverAt: Instant? = null,
+
+    @Column(name = "taken_over_by")
+    var takenOverBy: String? = null,
+
+    @Column(name = "taken_over_permit_id")
+    var takenOverPermitId: Long? = null,
+
+    @Column(name = "nurse_done_at")
+    var nurseDoneAt: Instant? = null,
+
+    @Column(name = "nurse_done_by")
+    var nurseDoneBy: String? = null,
+
+    @Column(name = "family_done_at")
+    var familyDoneAt: Instant? = null,
+
+    @Column(name = "family_done_by")
+    var familyDoneBy: String? = null,
+
+    @Column(name = "cancelled_at")
+    var cancelledAt: Instant? = null,
+
+    @Column(name = "cancelled_by")
+    var cancelledBy: String? = null
 )
 
 @Entity

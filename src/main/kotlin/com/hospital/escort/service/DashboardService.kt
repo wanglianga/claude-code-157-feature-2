@@ -4,6 +4,8 @@ import com.hospital.escort.api.ViolationDto
 import com.hospital.escort.api.WardDashboardDto
 import com.hospital.escort.common.ApiException
 import com.hospital.escort.domain.ApplicationStatus
+import com.hospital.escort.domain.CareReminderRepository
+import com.hospital.escort.domain.CareReminderStatus
 import com.hospital.escort.domain.CaseStatus
 import com.hospital.escort.domain.EscortApplicationRepository
 import com.hospital.escort.domain.EscortCaseRepository
@@ -36,6 +38,8 @@ class DashboardService(
     private val scanRepository: ScanRecordRepository,
     private val violationRepository: ViolationRecordRepository,
     private val applicationRepository: EscortApplicationRepository,
+    private val careReminderRepository: CareReminderRepository,
+    private val archiveQueryService: ArchiveQueryService,
     @Suppress("unused") private val syncRepository: PermitSyncRepository,
     @Value("\${escort.zone-id}") zoneIdValue: String
 ) {
@@ -89,6 +93,11 @@ class DashboardService(
             )
         }
 
+        // 临时替换空窗: 旧陪护已离院、新陪护未到的患者, 以及待护士处理的看护提醒
+        val unattended = archiveQueryService.listUnattendedPatients(wardCode)
+        val pendingCareReminders = careReminderRepository
+            .countByWardCodeAndStatus(wardCode, CareReminderStatus.PENDING_NURSE)
+
         return WardDashboardDto(
             wardCode = wardCode, lockdown = policy.lockdown,
             activeEscortCount = insideCount, activePatientCount = activePatients,
@@ -97,7 +106,10 @@ class DashboardService(
             violationCount = violations.size.toLong(), violationsByType = byType,
             expiredNotReturnedCount = expiredNotReturned, pendingApplications = pendingApplications,
             avgReturnHours = avgReturnHours?.let { Math.round(it * 100) / 100.0 },
-            openViolations = openViolations
+            openViolations = openViolations,
+            unattendedPatientCount = unattended.size.toLong(),
+            pendingCareReminderCount = pendingCareReminders,
+            unattendedPatients = unattended
         )
     }
 }

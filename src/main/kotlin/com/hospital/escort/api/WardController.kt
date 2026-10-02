@@ -1,6 +1,7 @@
 package com.hospital.escort.api
 
 import com.hospital.escort.service.ArchiveQueryService
+import com.hospital.escort.service.CareReminderService
 import com.hospital.escort.service.DashboardService
 import com.hospital.escort.service.WardAdminService
 import jakarta.validation.Valid
@@ -12,13 +13,14 @@ import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
 
-/** 病区管理: 策略查询、封闭管理、转科、外出限制、押金争议、病区通知 */
+/** 病区管理: 策略查询、封闭管理、转科、外出限制、押金争议、病区通知、空窗患者/看护提醒 */
 @RestController
 @RequestMapping("/api/wards")
 class WardController(
     private val wardAdminService: WardAdminService,
     private val archiveQueryService: ArchiveQueryService,
-    private val dashboardService: DashboardService
+    private val dashboardService: DashboardService,
+    private val careReminderService: CareReminderService
 ) {
 
     @GetMapping
@@ -56,6 +58,21 @@ class WardController(
     @GetMapping("/{wardCode}/notices")
     fun notices(@PathVariable wardCode: String, @RequestParam(defaultValue = "false") unreadOnly: Boolean): List<WardNoticeDto> =
         archiveQueryService.listWardNotices(wardCode, unreadOnly)
+
+    /** 当前短时无人陪护的患者（旧陪护已离院、新陪护未到），供护士站安排巡查 */
+    @GetMapping("/{wardCode}/unattended")
+    fun unattended(@PathVariable wardCode: String): List<UnattendedPatientDto> =
+        archiveQueryService.listUnattendedPatients(wardCode)
+
+    /** 病区看护提醒（默认只看待处理：待护士处理 + 家属已接手未完成） */
+    @GetMapping("/{wardCode}/care-reminders")
+    fun careReminders(
+        @PathVariable wardCode: String,
+        @RequestParam(defaultValue = "true") activeOnly: Boolean
+    ): List<CareReminderDto> =
+        careReminderService.listByWard(wardCode, activeOnly).map {
+            archiveQueryService.toCareReminderDto(it)
+        }
 
     /** 管理者看板 */
     @GetMapping("/{wardCode}/dashboard")

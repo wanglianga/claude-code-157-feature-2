@@ -28,10 +28,20 @@ temp/
 *.har
 *.sqlite
 *.db
-*screenshot*
-*screen-capture*
-*recording*
-*trace*
-*debug*
-*temp*
-*tmp*
+
+# 例外: "临时替换"业务源码/迁移/测试文件名含 Temporary/temporary, 不属于临时文件
+!**/Temporary*.kt
+!**/V2__temporary_replacement.sql
+.local/*.tar
+.local/*.tar.gz
+.local/*.tgz
+.local/*.zip
+.local/*.7z
+*screenshot*.png
+*screenshot*.jpg
+*screenshot*.jpeg
+*screen-capture*.png
+*screen-capture*.jpg
+*recording*.webm
+*recording*.mp4
+*trace*.jsonl

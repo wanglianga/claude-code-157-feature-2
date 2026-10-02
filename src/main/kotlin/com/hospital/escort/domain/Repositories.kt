@@ -55,6 +55,29 @@ interface PermitSyncRepository : JpaRepository<PermitSync, Long> {
 
 interface ReplacementRecordRepository : JpaRepository<ReplacementRecord, Long> {
     fun findByCaseIdOrderByRequestedAtAsc(caseId: Long): List<ReplacementRecord>
+    fun findByModeAndStatus(mode: ReplacementMode, status: ReplacementStatus): List<ReplacementRecord>
+
+    /** 某患者进行中(未完成/未取消)的临时替换, 防止重复发起 */
+    fun findByCaseIdAndModeAndStatusIn(
+        caseId: Long, mode: ReplacementMode, statuses: Collection<ReplacementStatus>
+    ): List<ReplacementRecord>
+}
+
+interface PatrolRecordRepository : JpaRepository<PatrolRecord, Long> {
+    fun findByReplacementIdOrderByScheduledAtAsc(replacementId: Long): List<PatrolRecord>
+    fun findByCaseIdOrderByScheduledAtAsc(caseId: Long): List<PatrolRecord>
+}
+
+interface CareReminderRepository : JpaRepository<CareReminder, Long> {
+    fun findByCaseIdOrderByRemindAtAsc(caseId: Long): List<CareReminder>
+    fun findByReplacementIdOrderByRemindAtAsc(replacementId: Long): List<CareReminder>
+    fun findByWardCodeAndStatusInOrderByRemindAtAsc(
+        wardCode: String, statuses: Collection<CareReminderStatus>
+    ): List<CareReminder>
+    fun countByWardCodeAndStatus(wardCode: String, status: CareReminderStatus): Long
+    fun findByReplacementIdAndStatusIn(
+        replacementId: Long, statuses: Collection<CareReminderStatus>
+    ): List<CareReminder>
 }
 
 interface ScanRecordRepository : JpaRepository<ScanRecord, Long> {
